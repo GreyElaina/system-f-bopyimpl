@@ -131,7 +131,7 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
             FForAll(left_generic, left_bound, left_body),
             FForAll(right_generic, right_bound, right_body),
         ):
-            generic_compliant = is_subtype(context, right_bound, left_body)
+            generic_compliant = is_subtype(context, right_bound, left_bound)
             new_generic_name = unique_string(get_free_variables(left_body) | get_free_variables(right_body))
             new_left_body = substitude_type(
                 left_body, left_generic, FVar(new_generic_name, True)
@@ -161,7 +161,7 @@ def type_of(context: TContext, term: FTerm) -> FType:
             binding = find_binding(context, name)
             if binding is None or not isinstance(binding, FTermBind):
                 raise TypeMismatchError(
-                    f"Type mismatchCannot find variable of name {name} in context"
+                    f"cannot find variable of name {name} in context"
                 )
             return binding.term_type
         case FTAbs(generic, generic_type, body):
@@ -178,10 +178,10 @@ def type_of(context: TContext, term: FTerm) -> FType:
                 if is_subtype(context, arg_type, func_type_infered.domain):
                     return func_type_infered.result
                 raise TypeMismatchError(
-                    f"Type mismatch: expected argument type to be a subtype of {func_type_infered.domain}, got {arg_type}"
+                    f"expected argument type to be a subtype of {func_type_infered.domain}, got {arg_type}"
                 )
             raise TypeMismatchError(
-                f"Type mismatch: expected arrow type, got {func_type_infered}"
+                f"expected arrow type, got {func_type_infered}"
             )
         case FTTypeAbs(generic, bound, body):
             return FForAll(
@@ -195,11 +195,11 @@ def type_of(context: TContext, term: FTerm) -> FType:
                     if is_subtype(context, arg, bound):
                         return substitude_type(body, generic, arg)
                     raise TypeMismatchError(
-                        f"Type mismatch: expected argument type to be a subtype of {bound}, got {arg}"
+                        f"expected argument type to be a subtype of {bound}, got {arg}"
                     )
                 case t:
                     raise TypeMismatchError(
-                        f"Type mismatch: expected generic (forall) type, got {t}"
+                        f"expected generic (forall) type, got {t}"
                     )
         case FTCond(cond, then_branch, else_branch):
             cond_type = type_of(context, cond)
@@ -208,7 +208,7 @@ def type_of(context: TContext, term: FTerm) -> FType:
             if cond_type is FBool:
                 return FUnion(then_branch_type, else_branch_type)
             raise TypeMismatchError(
-                f"Type mismatch: expected boolean condition, got {cond_type}"
+                f"expected boolean condition, got {cond_type}"
             )
         case FTBool():
             return FBool
@@ -224,7 +224,7 @@ def type_of(context: TContext, term: FTerm) -> FType:
             if isinstance(arg, FArrow) and arg.domain == arg.result:
                 return arg.domain
             raise TypeMismatchError(
-                f"Type mismatch: the type of a fix operator must be a function type, which, accepts a function type, and returns an identical function type"
+                f"the type of a fix operator must be a function type, which, accepts a function type, and returns an identical function type"
             )
         case _:
             raise TypeError(f"Unknown type: {term}")
