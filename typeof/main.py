@@ -52,18 +52,18 @@ def find_first_non_monotype(context: TContext, input: FType) -> FType | None:
     return input
 
 
-def fv_type(t: FType) -> set[str]:
+def get_free_variables(t: FType) -> set[str]:
     match t:
         case FVar(name):
             return {name}
         case FUnion(left, right):
-            return fv_type(left) | fv_type(right)
+            return get_free_variables(left) | get_free_variables(right)
         case FIntersection(left, right):
-            return fv_type(left) | fv_type(right)
+            return get_free_variables(left) | get_free_variables(right)
         case FArrow(domain, result):
-            return fv_type(domain) | fv_type(result)
+            return get_free_variables(domain) | get_free_variables(result)
         case FForAll(generic, bound, body):
-            res = fv_type(bound) | fv_type(body)
+            res = get_free_variables(bound) | get_free_variables(body)
             res.discard(generic)
             return res
         case _:
@@ -95,8 +95,8 @@ def substitude_type(t: FType, name: str, replace_to: FType) -> FType:
             if name == generic:
                 return t
 
-            if generic in fv_type(replace_to):
-                new_generic = unique_string(fv_type(replace_to) | fv_type(body))
+            if generic in get_free_variables(replace_to):
+                new_generic = unique_string(get_free_variables(replace_to) | get_free_variables(body))
                 new_body = substitude_type(body, generic, FVar(new_generic, True))
                 return FForAll(
                     new_generic, bound, substitude_type(new_body, name, replace_to)
@@ -132,7 +132,7 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
             FForAll(right_generic, right_bound, right_body),
         ):
             generic_compliant = is_subtype(context, right_bound, left_body)
-            new_generic_name = unique_string(fv_type(left_body) | fv_type(right_body))
+            new_generic_name = unique_string(get_free_variables(left_body) | get_free_variables(right_body))
             new_left_body = substitude_type(
                 left_body, left_generic, FVar(new_generic_name, True)
             )
@@ -214,8 +214,11 @@ def type_of(context: TContext, term: FTerm) -> FType:
             return FBool
         case FTNat():
             return FNat
-        case FTIsZero(arg) | FTSuccessor(arg) | FTPredecessor(arg):
+        case FTIsZero(arg):
             return check_nat(context, arg)
+        case FTSuccessor(arg) | FTPredecessor(arg):
+            check_nat(context, arg)
+            return FNat
         case FTFix(arg):
             arg_type = type_of(context, arg)
             if isinstance(arg, FArrow) and arg.domain == arg.result:
