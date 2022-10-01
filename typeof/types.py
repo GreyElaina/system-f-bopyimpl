@@ -6,6 +6,10 @@ class FType:
     def __repr__(self):
         if self is FBool:
             return "bool"
+        elif self is FFalse:
+            return "false"
+        elif self is FTrue:
+            return "true"
         elif self is FNat:
             return "nat"
         elif self is FTop:
@@ -13,8 +17,8 @@ class FType:
         elif self is FBottom:
             return "never"
 
-
-FBool = FType()
+FTrue = FType()
+FFalse = FType()
 FNat = FType()
 FTop = FType()
 FBottom = FType()
@@ -37,6 +41,7 @@ class FUnion(FType):
                 return f"({repr(left)}) | ({repr(right)})"
 
 
+FBool = FUnion(FTrue, FFalse)
 @dataclass(unsafe_hash=True)
 class FIntersection(FType):
     left: FType

@@ -4,10 +4,12 @@ from .types import (
     FArrow,
     FBool,
     FBottom,
+    FFalse,
     FForAll,
     FIntersection,
     FNat,
     FTop,
+    FTrue,
     FType,
     FUnion,
     FVar,
@@ -96,7 +98,9 @@ def substitude_type(t: FType, name: str, replace_to: FType) -> FType:
                 return t
 
             if generic in get_free_variables(replace_to):
-                new_generic = unique_string(get_free_variables(replace_to) | get_free_variables(body))
+                new_generic = unique_string(
+                    get_free_variables(replace_to) | get_free_variables(body)
+                )
                 new_body = substitude_type(body, generic, FVar(new_generic, True))
                 return FForAll(
                     new_generic, bound, substitude_type(new_body, name, replace_to)
@@ -132,7 +136,9 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
             FForAll(right_generic, right_bound, right_body),
         ):
             generic_compliant = is_subtype(context, right_bound, left_bound)
-            new_generic_name = unique_string(get_free_variables(left_body) | get_free_variables(right_body))
+            new_generic_name = unique_string(
+                get_free_variables(left_body) | get_free_variables(right_body)
+            )
             new_left_body = substitude_type(
                 left_body, left_generic, FVar(new_generic_name, True)
             )
@@ -180,9 +186,7 @@ def type_of(context: TContext, term: FTerm) -> FType:
                 raise TypeMismatchError(
                     f"expected argument type to be a subtype of {func_type_infered.domain}, got {arg_type}"
                 )
-            raise TypeMismatchError(
-                f"expected arrow type, got {func_type_infered}"
-            )
+            raise TypeMismatchError(f"expected arrow type, got {func_type_infered}")
         case FTTypeAbs(generic, bound, body):
             return FForAll(
                 generic,
@@ -198,18 +202,22 @@ def type_of(context: TContext, term: FTerm) -> FType:
                         f"expected argument type to be a subtype of {bound}, got {arg}"
                     )
                 case t:
-                    raise TypeMismatchError(
-                        f"expected generic (forall) type, got {t}"
-                    )
+                    raise TypeMismatchError(f"expected generic (forall) type, got {t}")
         case FTCond(cond, then_branch, else_branch):
             cond_type = type_of(context, cond)
             then_branch_type = type_of(context, then_branch)
             else_branch_type = type_of(context, else_branch)
-            if cond_type is FBool:
+            if cond_type is FTrue:
+                return then_branch_type
+            elif cond_type is FFalse:
+                return else_branch_type
+            elif cond_type is FBool:
                 return FUnion(then_branch_type, else_branch_type)
-            raise TypeMismatchError(
-                f"expected boolean condition, got {cond_type}"
-            )
+            raise TypeMismatchError(f"expected boolean condition, got {cond_type}")
+        case FTBool(True):
+            return FTrue
+        case FTBool(False):
+            return FFalse
         case FTBool():
             return FBool
         case FTNat():
