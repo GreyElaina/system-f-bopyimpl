@@ -1,3 +1,5 @@
+// @author: dylech30th
+
 // ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable UnusedType.Global
 // ReSharper disable ClassNeverInstantiated.Global
