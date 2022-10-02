@@ -108,7 +108,11 @@ def substitude_type(t: FType, name: str, replace_to: FType) -> FType:
                     substitude_type(new_body, name, replace_to)
                 )
 
-            return FForAll(generic, substitude_type(bound, name, replace_to), substitude_type(body, name, replace_to))
+            return FForAll(
+                generic,
+                substitude_type(bound, name, replace_to),
+                substitude_type(body, name, replace_to)
+            )
         case _:
             return t
 
@@ -140,7 +144,7 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
         ):
             generic_compliant = is_subtype(context, right_bound, left_bound)
             new_generic_name = unique_string(
-                get_free_variables(left_body) | get_free_variables(right_body)
+                get_free_variables(left_body) | get_free_variables(right_body) | {i.name for i in context if isinstance(i, FTypeBind)}
             )
             new_left_body = substitude_type(
                 left_body, left_generic, FVar(new_generic_name, True)
