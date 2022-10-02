@@ -103,15 +103,18 @@ def substitude_type(t: FType, name: str, replace_to: FType) -> FType:
                 )
                 new_body = substitude_type(body, generic, FVar(new_generic, True))
                 return FForAll(
-                    new_generic, bound, substitude_type(new_body, name, replace_to)
+                    new_generic,
+                    substitude_type(bound, name, replace_to),
+                    substitude_type(new_body, name, replace_to)
                 )
 
-            return FForAll(generic, bound, substitude_type(body, name, replace_to))
+            return FForAll(generic, substitude_type(bound, name, replace_to), substitude_type(body, name, replace_to))
         case _:
             return t
 
 
 def is_subtype(context: TContext, left: FType, right: FType) -> bool:
+    print(f"judging ({left}) <: ({right}), in {context}")
     match (left, right):
         case (_, _) if left == right:
             return True
@@ -159,7 +162,6 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
             )
         case _:
             return False
-
 
 def type_of(context: TContext, term: FTerm) -> FType:
     match term:
