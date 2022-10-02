@@ -89,3 +89,10 @@ class FForAll(FType):
 
     def __repr__(self):
         return f"∀{self.generic}<:{repr(self.bound)}.{repr(self.body)}"
+
+@dataclass
+class FStructShape(FType):
+    shape: dict[str, FType]
+
+    def __hash__(self) -> int:
+        return hash(hash("FStructShape") + hash(tuple(self.shape.items())))

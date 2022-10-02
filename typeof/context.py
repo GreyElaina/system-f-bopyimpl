@@ -24,3 +24,9 @@ def widen_ctx(context: TContext, binding: ContextBind):
     copied_context = context.copy()
     copied_context.append(binding)
     return copied_context
+
+
+def find_binding(context: TContext, name: str):
+    for i in context:
+        if i.name == name:
+            return i

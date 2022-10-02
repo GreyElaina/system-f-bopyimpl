@@ -1,4 +1,3 @@
-from typeof.util import unique_string
 from .error import TypeMismatchError, UnknownBindingError
 from .types import (
     FArrow,
@@ -8,6 +7,7 @@ from .types import (
     FForAll,
     FIntersection,
     FNat,
+    FStructShape,
     FTop,
     FTrue,
     FType,
@@ -23,13 +23,15 @@ from .term import (
     FTIsZero,
     FTNat,
     FTPredecessor,
+    FTStructShape,
     FTSuccessor,
     FTTypeAbs,
     FTTypeApp,
     FTerm,
     FTVar,
 )
-from .context import FTermBind, FTypeBind, TContext, widen_ctx
+from .context import ContextBind, FTermBind, FTypeBind, TContext, widen_ctx, find_binding
+from .util import unique_string
 
 
 def check_nat(context: TContext, term: FTerm):
@@ -37,11 +39,6 @@ def check_nat(context: TContext, term: FTerm):
         return FBool
     raise TypeMismatchError(f"expected nat, got {repr(t)}")
 
-
-def find_binding(context: TContext, name: str):
-    for i in context:
-        if i.name == name:
-            return i
 
 
 def find_first_non_monotype(context: TContext, input: FType) -> FType | None:
@@ -156,6 +153,13 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
             return generic_compliant and is_subtype(
                 new_context, new_left_body, new_right_body
             )
+        case (FStructShape(left_shape), FStructShape(right_shape)):
+            for label, anno in left_shape.items():
+                if label not in right_shape:
+                    continue
+                if not is_subtype(context, anno, right_shape[label]):
+                    return False
+            return True
         case (_, FUnion(union_left, union_right)):
             return is_subtype(context, left, union_left) or is_subtype(
                 context, right, union_right
@@ -164,6 +168,19 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
             return is_subtype(context, left, intersection_left) and is_subtype(
                 context, right, intersection_right
             )
+        case _:
+            return False
+
+
+def is_conclict(context: TContext, extern_binding: ContextBind) -> bool:
+    existed_binding = find_binding(context, extern_binding.name)
+    if existed_binding is None:
+        return False
+    match existed_binding, extern_binding:
+        case (FTypeBind(_, existed), FTypeBind(_, extern)):
+            return is_subtype(context, extern, existed)
+        case (FTermBind(_, existed), FTermBind(_, extern)):
+            return is_subtype(context, extern, existed)
         case _:
             return False
 
@@ -233,6 +250,8 @@ def type_of(context: TContext, term: FTerm) -> FType:
         case FTSuccessor(arg) | FTPredecessor(arg):
             check_nat(context, arg)
             return FNat
+        case FTStructShape(shape):
+            return FStructShape({k: type_of(context, v) for k, v in shape.items()})
         case FTFix(arg):
             arg_type = type_of(context, arg)
             if isinstance(arg, FArrow) and arg.domain == arg.result:

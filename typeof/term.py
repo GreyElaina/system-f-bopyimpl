@@ -74,3 +74,11 @@ class FTTypeAbs(FTerm):
 class FTTypeApp(FTerm):
     func: FTerm
     arg: FType
+
+
+@dataclass
+class FTStructShape(FTerm):
+    shape: dict[str, FTerm]
+
+    def __hash__(self) -> int:
+        return hash(hash("FTStructShape") + hash(tuple(self.shape.items())))
