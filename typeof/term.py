@@ -4,81 +4,120 @@ from .types import FType
 
 
 @dataclass(unsafe_hash=True)
-class FTerm:
+class Exp:
     pass
 
 
 @dataclass(unsafe_hash=True)
-class FTVar(FTerm):
+class Variable(Exp):
     name: str
 
 
 @dataclass(unsafe_hash=True)
-class FTAbs(FTerm):
+class Abstraction(Exp):
     generic: str
     generic_type: FType
-    body: FTerm
+    body: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTApp(FTerm):
-    func: FTerm
-    arg: FTerm
+class Application(Exp):
+    func: Exp
+    arg: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTBool(FTerm):
+class Boolean(Exp):
     value: bool
 
 
 @dataclass(unsafe_hash=True)
-class FTNat(FTerm):
+class Nat(Exp):
     value: int
 
 
 @dataclass(unsafe_hash=True)
-class FTSuccessor(FTerm):
-    arg: FTerm
+class FTSuccessor(Exp):
+    arg: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTPredecessor(FTerm):
-    arg: FTerm
+class FTPredecessor(Exp):
+    arg: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTIsZero(FTerm):
-    arg: FTerm
+class FTIsZero(Exp):
+    arg: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTCond(FTerm):
-    cond: FTerm
-    then: FTerm
-    else_: FTerm
+class If(Exp):
+    condition: Exp
+    then: Exp
+    else_: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTFix(FTerm):
-    arg: FTerm
+class FTFix(Exp):
+    arg: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTTypeAbs(FTerm):
+class FTTypeAbs(Exp):
     generic: str
     bound: FType
-    body: FTerm
+    body: Exp
 
 
 @dataclass(unsafe_hash=True)
-class FTTypeApp(FTerm):
-    func: FTerm
+class FTTypeApp(Exp):
+    func: Exp
     arg: FType
 
 
 @dataclass
-class FTStructShape(FTerm):
-    shape: dict[str, FTerm]
+class StructShape(Exp):
+    shape: dict[str, Exp]
 
     def __hash__(self) -> int:
         return hash(hash("FTStructShape") + hash(tuple(self.shape.items())))
+
+Any = Exp()
+Never = Exp()
+
+
+@dataclass
+class LiteralValue(Exp):
+    value: Exp
+
+@dataclass
+class SubtypeOf(Exp):
+    left: Exp
+    right: Exp
+
+@dataclass
+class Equals(Exp):
+    left: Exp
+    right: Exp
+
+@dataclass
+class Union(Exp):
+    members: list[Exp]
+
+    def __init__(self, *members: Exp):
+        self.members = list(members)
+
+@dataclass
+class Intersection(Exp):
+    members: list[Exp]
+
+    def __init__(self, *members: Exp):
+        self.members = list(members)
+
+@dataclass
+class Sequence(Exp):
+    members: list[Exp]
+
+    def __init__(self, *members: Exp):
+        self.members = list(members)

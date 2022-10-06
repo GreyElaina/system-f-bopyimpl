@@ -13,6 +13,7 @@ class FType:
         elif self is FBottom:
             return "never"
 
+
 FBool = FType()
 FNat = FType()
 FTop = FType()
@@ -21,36 +22,12 @@ FBottom = FType()
 
 @dataclass(unsafe_hash=True)
 class FUnion(FType):
-    left: FType
-    right: FType
-
-    def __repr__(self):
-        match (self.left, self.right):
-            case (FVar(left), FVar(right)):
-                return f"{left} | {right}"
-            case (FVar(left), right):
-                return f"{left} | ({repr(right)})"
-            case (left, FVar(right)):
-                return f"({repr(left)}) | {right}"
-            case (left, right):
-                return f"({repr(left)}) | ({repr(right)})"
+    members: list[FType]
 
 
 @dataclass(unsafe_hash=True)
 class FIntersection(FType):
-    left: FType
-    right: FType
-
-    def __repr__(self):
-        match (self.left, self.right):
-            case (FVar(left), FVar(right)):
-                return f"#{left} | #{right}"
-            case (FVar(left), right):
-                return f"#{left} | ({repr(right)})"
-            case (left, FVar(right)):
-                return f"({repr(left)}) | #{right}"
-            case (left, right):
-                return f"({repr(left)}) | ({repr(right)})"
+    members: list[FType]
 
 
 @dataclass(unsafe_hash=True)
@@ -84,9 +61,13 @@ class FForAll(FType):
     def __repr__(self):
         return f"∀{self.generic}<:{repr(self.bound)}.{repr(self.body)}"
 
+
 @dataclass
 class FStructShape(FType):
     shape: dict[str, FType]
 
     def __hash__(self) -> int:
         return hash(hash("FStructShape") + hash(tuple(self.shape.items())))
+
+
+# TODO: kinding type, type operator to support generic in a better way.

@@ -1,3 +1,4 @@
+from functools import reduce
 from .error import TypeMismatchError, UnknownBindingError
 from .types import (
     FArrow,
@@ -13,30 +14,44 @@ from .types import (
     FVar,
 )
 from .term import (
-    FTAbs,
-    FTApp,
-    FTBool,
-    FTCond,
+    Abstraction,
+    Any,
+    Application,
+    Boolean,
+    Equals,
+    If,
     FTFix,
     FTIsZero,
-    FTNat,
+    Intersection,
+    LiteralValue,
+    Nat,
     FTPredecessor,
-    FTStructShape,
+    StructShape,
+    SubtypeOf,
     FTSuccessor,
+    Never,
     FTTypeAbs,
     FTTypeApp,
-    FTerm,
-    FTVar,
+    Exp,
+    Union,
+    Variable,
 )
-from .context import ContextBind, FTermBind, FTypeBind, TContext, widen_ctx, find_binding
+from .context import (
+    ContextBind,
+    FExpAlias,
+    FTermBind,
+    FTypeBind,
+    TContext,
+    widen_ctx,
+    find_binding,
+)
 from .util import unique_string
 
 
-def check_nat(context: TContext, term: FTerm):
+def check_nat(context: TContext, term: Exp):
     if (t := type_of(context, term)) is FNat:
         return FBool
     raise TypeMismatchError(f"expected nat, got {repr(t)}")
-
 
 
 def find_first_non_monotype(context: TContext, input: FType) -> FType | None:
@@ -49,14 +64,20 @@ def find_first_non_monotype(context: TContext, input: FType) -> FType | None:
     return input
 
 
+def get_variable_expalias(context: TContext, var_name: str) -> Exp | None:
+    for i in context:
+        if i.name == var_name and isinstance(i, FExpAlias):
+            return i.exp
+
+
 def get_free_variables(t: FType) -> set[str]:
     match t:
         case FVar(name):
             return {name}
-        case FUnion(left, right):
-            return get_free_variables(left) | get_free_variables(right)
-        case FIntersection(left, right):
-            return get_free_variables(left) | get_free_variables(right)
+        case FUnion(members):
+            return reduce(set.union, [get_free_variables(mem) for mem in members])
+        case FIntersection(members):
+            return reduce(set.union, [get_free_variables(mem) for mem in members])
         case FArrow(domain, result):
             return get_free_variables(domain) | get_free_variables(result)
         case FForAll(generic, bound, body):
@@ -73,16 +94,14 @@ def substitude_type(t: FType, name: str, replace_to: FType) -> FType:
             if name == n:
                 return replace_to
             return t
-        case FUnion(left, right):
-            return FUnion(
-                substitude_type(left, name, replace_to),
-                substitude_type(right, name, replace_to),
-            )
-        case FIntersection(left, right):
-            return FIntersection(
-                substitude_type(left, name, replace_to),
-                substitude_type(right, name, replace_to),
-            )
+        case FUnion(members):
+            return FUnion([
+                substitude_type(i, name, replace_to)
+            for i in members])
+        case FIntersection(members):
+            return FIntersection([
+                substitude_type(i, name, replace_to)
+            for i in members])
         case FArrow(domain, result):
             return FArrow(
                 substitude_type(domain, name, replace_to),
@@ -100,13 +119,13 @@ def substitude_type(t: FType, name: str, replace_to: FType) -> FType:
                 return FForAll(
                     new_generic,
                     substitude_type(bound, name, replace_to),
-                    substitude_type(new_body, name, replace_to)
+                    substitude_type(new_body, name, replace_to),
                 )
 
             return FForAll(
                 generic,
                 substitude_type(bound, name, replace_to),
-                substitude_type(body, name, replace_to)
+                substitude_type(body, name, replace_to),
             )
         case _:
             return t
@@ -121,6 +140,8 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
             return True
         case (_, _) if right == FBottom:
             return False
+        case (LiteralValue(left_value), _):
+            return is_subtype(context, type_of(context, left_value), right)
         case (FVar() as left_var, _):
             binding = find_binding(context, left_var.name)
             if isinstance(binding, FTypeBind):
@@ -139,7 +160,9 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
         ):
             generic_compliant = is_subtype(context, right_bound, left_bound)
             new_generic_name = unique_string(
-                get_free_variables(left_body) | get_free_variables(right_body) | {i.name for i in context if isinstance(i, FTypeBind)}
+                get_free_variables(left_body)
+                | get_free_variables(right_body)
+                | {i.name for i in context if isinstance(i, FTypeBind)}
             )
             new_left_body = substitude_type(
                 left_body, left_generic, FVar(new_generic_name, True)
@@ -160,14 +183,16 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
                 if not is_subtype(context, anno, right_shape[label]):
                     return False
             return True
-        case (_, FUnion(union_left, union_right)):
-            return is_subtype(context, left, union_left) or is_subtype(
-                context, right, union_right
-            )
-        case (_, FIntersection(intersection_left, intersection_right)):
-            return is_subtype(context, left, intersection_left) and is_subtype(
-                context, right, intersection_right
-            )
+        case (_, FUnion(members)):
+            for member in members:
+                if is_subtype(context, left, member):
+                    return True
+            return False
+        case (_, FIntersection(members)):
+            for member in members:
+                if not is_subtype(context, left, member):
+                    return False
+            return True
         case _:
             return False
 
@@ -180,25 +205,30 @@ def is_conclict(context: TContext, extern_binding: ContextBind) -> bool:
         case (FTypeBind(_, existed), FTypeBind(_, extern)):
             return is_subtype(context, extern, existed)
         case (FTermBind(_, existed), FTermBind(_, extern)):
-            return is_subtype(context, extern, existed)
+            return is_subtype(
+                context, extern, existed
+            )
         case _:
             return False
 
-def type_of(context: TContext, term: FTerm) -> FType:
+
+def type_of(context: TContext, term: Exp) -> FType:
     match term:
-        case FTVar(name):
+        case Variable(name):
             binding = find_binding(context, name)
             if binding is None or not isinstance(binding, FTermBind):
                 raise TypeMismatchError(
                     f"cannot find variable of name {name} in context"
                 )
             return binding.term_type
-        case FTAbs(generic, generic_type, body):
+        case Abstraction(generic, generic_type, body):
             return FArrow(
                 generic_type,
-                type_of(widen_ctx(context, FTermBind(generic, generic_type)), body),
+                type_of(
+                    widen_ctx(context, FTermBind(generic, generic_type)), body
+                ),
             )
-        case FTApp(func, arg):
+        case Application(func, arg):
             func_type = type_of(context, func)
             arg_type = type_of(context, arg)
 
@@ -226,20 +256,28 @@ def type_of(context: TContext, term: FTerm) -> FType:
                     )
                 case t:
                     raise TypeMismatchError(f"expected generic (forall) type, got {t}")
-        case FTCond(cond, then_branch, else_branch):
+        case If(_, then_branch, else_branch):
             then_branch_type = type_of(context, then_branch)
             else_branch_type = type_of(context, else_branch)
-            return FUnion(then_branch_type, else_branch_type)
-        case FTBool():
+            return FUnion([then_branch_type, else_branch_type])
+        case Union(members):
+            return FUnion([type_of(context, evaluate(context, i)) for i in members])
+        case Boolean():
             return FBool
-        case FTNat():
+        case Nat():
             return FNat
+        case LiteralValue(value):
+            return type_of(context, value)
+        case x if x is Never:
+            return FBottom
+        case x if x is Any:
+            return FTop
         case FTIsZero(arg):
             return check_nat(context, arg)
         case FTSuccessor(arg) | FTPredecessor(arg):
             check_nat(context, arg)
             return FNat
-        case FTStructShape(shape):
+        case StructShape(shape):
             return FStructShape({k: type_of(context, v) for k, v in shape.items()})
         case FTFix(arg):
             arg_type = type_of(context, arg)
@@ -250,3 +288,44 @@ def type_of(context: TContext, term: FTerm) -> FType:
             )
         case _:
             raise TypeError(f"Unknown type: {term}")
+
+
+def kinding_of(context: TContext, ftype: FType) -> ...:
+    ...
+
+
+def evaluate(context: TContext, term: Exp) -> Exp:
+    match term:
+        case Variable(name):
+            if (var_term := get_variable_expalias(context, name)) is None:
+                raise UnknownBindingError(f"cannot found '{name}' in current context")
+            return var_term
+        case If(cond, then, else_):
+            cond_eval_result = evaluate(context, cond)
+            match cond_eval_result:
+                case Boolean(True):
+                    return evaluate(context, then)
+                case Boolean(False):
+                    return evaluate(context, else_)
+                case _:
+                    raise TypeMismatchError(
+                        f"assert a boolean but received a {repr(cond_eval_result)}"
+                    )
+        case SubtypeOf(left, right):
+            left_eval_result = evaluate(context, left)
+            right_eval_result = evaluate(context, right)
+            return Boolean(
+                is_subtype(
+                    context,
+                    type_of(context, left_eval_result),
+                    type_of(context, right_eval_result),
+                )
+            )
+        case Equals(left, right):
+            return Boolean(evaluate(context, left) == evaluate(context, right))
+        case Union(members):
+            return Union(*[evaluate(context, i) for i in members])
+        case Intersection(members):
+            return Intersection(*[evaluate(context, i) for i in members])
+        case _:
+            return term

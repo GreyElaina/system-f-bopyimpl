@@ -1,11 +1,15 @@
 from typeof import *
-from typeof.context import FTypeBind, TContext
-from typeof.main import get_free_variables, is_subtype
-from typeof.term import FTStructShape
+from typeof.context import FExpAlias, FTermBind, FTypeBind, TContext
+from typeof.main import evaluate, get_free_variables, is_subtype
+from typeof.term import Any, BoundsOf, StructShape, SubtypeOf, Never
 from typeof.util import unique_string
 
 # zero = FForAll("X", FTop, FForAll("S"))
-b = FTCond(FTApp(FTAbs("X", FNat, FTBool(False)), FTNat(123)), FTNat(4), FTBool(True))
+b = If(
+    Application(Abstraction("X", FNat, Boolean(False)), Nat(123)),
+    Nat(4),
+    Boolean(True),
+)
 zero = FTTypeAbs(
     "X",
     FTop,
@@ -15,10 +19,10 @@ zero = FTTypeAbs(
         FTTypeAbs(
             "Z",
             FVar("X", True),
-            FTAbs(
+            Abstraction(
                 "x",
                 FArrow(FVar("X", True), FVar("S", True)),
-                FTAbs("z", FVar("Z", True), FTVar("z")),
+                Abstraction("z", FVar("Z", True), Variable("z")),
             ),
         ),
     ),
@@ -45,4 +49,11 @@ print(is_subtype(
 ))
 """
 
-print(type_of([], zero))
+ctx: TContext = [
+    FExpAlias("T", Boolean(False))
+]
+cond = SubtypeOf(left=StructShape({"a": Boolean(True)}), right=Any)
+t = If(cond, Nat(114514), Nat(45234523452345))
+# => StructShape({"a": Boolean(True)}) <: Any ? 114514 : Nat(45234523452345)
+
+print(evaluate(ctx, t))

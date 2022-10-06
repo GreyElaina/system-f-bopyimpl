@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import TypeAlias
 
+from typeof.term import Exp
+
 from .types import FType
 
 
@@ -11,12 +13,18 @@ class FTermBind:
 
 
 @dataclass(unsafe_hash=True)
+class FExpAlias:
+    name: str
+    exp: Exp
+
+
+@dataclass(unsafe_hash=True)
 class FTypeBind:
     name: str
     bound: FType
 
 
-ContextBind = FTermBind | FTypeBind
+ContextBind = FTermBind | FTypeBind | FExpAlias
 TContext: TypeAlias = list[ContextBind]
 
 
