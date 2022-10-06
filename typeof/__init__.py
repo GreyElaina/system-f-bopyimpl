@@ -2,8 +2,6 @@ from .main import type_of as type_of
 
 from .types import (
     FArrow as FArrow,
-    FTrue as FTrue,
-    FFalse as FFalse,
     FBool as FBool,
     FBottom as FBottom,
     FForAll as FForAll,

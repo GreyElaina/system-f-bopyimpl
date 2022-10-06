@@ -3,13 +3,11 @@ from .types import (
     FArrow,
     FBool,
     FBottom,
-    FFalse,
     FForAll,
     FIntersection,
     FNat,
     FStructShape,
     FTop,
-    FTrue,
     FType,
     FUnion,
     FVar,
@@ -154,6 +152,8 @@ def is_subtype(context: TContext, left: FType, right: FType) -> bool:
                 new_context, new_left_body, new_right_body
             )
         case (FStructShape(left_shape), FStructShape(right_shape)):
+            if not set(left_shape.keys()).issuperset(right_shape.keys()):
+                return False
             for label, anno in left_shape.items():
                 if label not in right_shape:
                     continue
@@ -227,20 +227,9 @@ def type_of(context: TContext, term: FTerm) -> FType:
                 case t:
                     raise TypeMismatchError(f"expected generic (forall) type, got {t}")
         case FTCond(cond, then_branch, else_branch):
-            cond_type = type_of(context, cond)
             then_branch_type = type_of(context, then_branch)
             else_branch_type = type_of(context, else_branch)
-            if cond_type is FTrue:
-                return then_branch_type
-            elif cond_type is FFalse:
-                return else_branch_type
-            elif cond_type is FBool:
-                return FUnion(then_branch_type, else_branch_type)
-            raise TypeMismatchError(f"expected boolean condition, got {cond_type}")
-        case FTBool(True):
-            return FTrue
-        case FTBool(False):
-            return FFalse
+            return FUnion(then_branch_type, else_branch_type)
         case FTBool():
             return FBool
         case FTNat():
